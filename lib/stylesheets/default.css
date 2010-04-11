@@ -116,4 +116,44 @@ Don't edit this file: It gets re-copied every time the server starts.
   font-size: small;
 }
 
+/* autocomplete panel */
+.ac_panel {
+  position:absolute;
+  color: #000;
+  background: #fff;
+  border: solid;
+  border-color: #ccc;
+  border-width: 0 1px 1px 1px;
+  z-index: 1000;
+}
 
+ul#autocomplete {
+  background: #fff;
+  padding: 0;
+  margin: 0;
+  z-index: 1000;
+}
+
+ul#autocomplete li {
+  height: 18px;
+  line-height: 18px;
+  overflow: hidden;
+  float: none;
+}
+
+.ac_panel li {
+  padding: 2px;
+  clear: both;
+  height: 14px;
+  line-height: 14px;
+}
+
+.ac_panel li:hover, .ac_panel li.selected {
+  cursor: pointer;
+  background: #eaeaea;
+}
+
+ul#autocomplete li.selected {
+  cursor: pointer;
+  background: #eaeaea;
+}
