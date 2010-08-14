@@ -1,0 +1,7 @@
+<% @index = AdminAssistant::Index.new(@admin_assistant, self, @controller.params) %>
+<% 
+  col_def_array = []
+  @index.view(self).columns.each do |column| 
+    col_def_array << column
+  end -%><%= col_def_array.map(&:name).join(',') %>
+<%= @index.records(10000000).map{|record| col_def_array.map{|col| col.index_html(record)}.join(',')}.join("\r") -%>

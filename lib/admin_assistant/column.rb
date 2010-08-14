@@ -1,146 +1,108 @@
 class AdminAssistant
-  class Column    
-    def form_view(action_view, admin_assistant, opts = {})
-      view 'FormView', action_view, admin_assistant, opts
-    end
-    
-    def index_view(action_view, admin_assistant, opts = {})
-      view 'IndexView', action_view, admin_assistant, opts
-    end
-    
-    def search_view(action_view, admin_assistant, opts = {})
-      view 'SearchView', action_view, admin_assistant, opts
-    end
-    
-    def show_view(action_view, admin_assistant, opts = {})
-      view 'ShowView', action_view, admin_assistant, opts
-    end
-    
-    def verify_for_search
-      # nothing here, maybe implemented in subclasses
-    end
-    
-    def view(view_class_name, action_view, admin_assistant, opts)
-      klass = begin
-        self.class.const_get view_class_name
-      rescue NameError
-        AdminAssistant::Column.const_get view_class_name
-      end
-      klass.new self, action_view, admin_assistant, opts
-    end
-    
-    module FormViewMethods
-      def after_html(rails_form)
-        after = render_from_custom_template("_after_#{name}_input", rails_form)
-        if after
-          after
-        else
-          helper_method = "after_#{name}_input"
-          if @action_view.respond_to?(helper_method)
-            @action_view.send(helper_method, rails_form.object)
-          end
-        end
-      end
-    
-      def controller
-        @action_view.controller
-      end
-      
-      def custom_template_file_path(slug)
-        File.join(
-          RAILS_ROOT, 'app/views', controller.controller_path, 
-          "#{slug}.html.erb"
-        )
-      end
-      
-      def description
-        @description
-      end
-      
-      def file_option_for_custom_template_render(slug)
-        if RAILS_GEM_VERSION == '2.1.0'
-          File.join(controller.controller_path, "#{slug}.html.erb")
-        else
-          custom_template_file_path slug
-        end
-      end
+  class Column
+    attr_accessor :custom_label
 
-      def html(rails_form)
-        record = rails_form.object
-        hff = render_from_custom_template "_#{name}_input", rails_form
-        hff ||= html_from_helper_method(record)
-        hff ||= if @read_only
-          value record
-        elsif @write_once && @action_view.action_name == 'edit'
-          value record
-        else
-          default_html rails_form
-        end
-        if ah = after_html(rails_form)
-          hff << ah
-        end
-        hff
-      end
-    
-      def html_from_helper_method(record)
-        html_method = "#{name}_input"
-        if @action_view.respond_to?(html_method)
-          @action_view.send(html_method, record)
-        end
-      end
-      
-      def render_from_custom_template(slug, rails_form)
-        if File.exist?(custom_template_file_path(slug))
-          varname = @model_class.name.underscore
-          @action_view.instance_variable_set(
-            "@#{varname}".to_sym, rails_form.object
-          )
-          @action_view.render(
-            :file => file_option_for_custom_template_render(slug),
-            :locals => {
-              varname.to_sym => rails_form.object,
-              :form => rails_form
-            }
-          )
-        end
-      end
-      
-      def set_instance_variables_from_options(admin_assistant, opts)
-        setting = admin_assistant.form_settings[name.to_sym]
-        ivars = %w(
-          clear_link datetime_select_options date_select_options description
-          image_size input select_choices select_options text_area_options
-        )
-        ivars.each do |ivar|
-          instance_variable_set "@#{ivar}".to_sym, setting.send(ivar)
-        end
-        if @action_view.respond_to?(name + '_url')
-          @file_url_method = @action_view.method(name + '_url')
-        end
-        @read_only = setting.read_only?
-        @write_once = setting.write_once?
-      end
+    def view(action_view, opts = {})
+      klass = self.class.const_get 'View'
+      klass.new self, action_view, opts
     end
-    
-    module IndexViewMethods
-      def header_css_class
+  
+    class View < Delegator
+      attr_reader :sort_order
+      
+      def initialize(column, action_view, opts)
+        super(column)
+        @column, @action_view, @opts = column, action_view, opts
+        @input = opts[:input]
+        @link_to_args = opts[:link_to_args]
+        @search = opts[:search]
+        @sort_order = opts[:sort_order]
+        @acts_as_list_position_column = opts[:acts_as_list_position_column]
+      end
+      
+      def __getobj__
+        @column
+      end
+      
+      def __setobj__(column)
+        @column = column
+      end
+      
+      def form_value(record)
+        value_method = "#{@column.name}_value"
+        if @action_view.respond_to?(value_method)
+          @action_view.send value_method, record
+        else
+          field_value record
+        end
+      end
+      
+      def index_header_css_class
         "sort #{sort_order}" if sort_order
       end
       
-      def html(record)
+      def index_td_css_class
+        ary = []
+        ary << "aacol_#{@column.name.underscorize}"
+        ary << 'sort' if sort_order
+        ary.join(' ')
+      end
+      
+      def index_html(record)
         html_for_index_method = "#{name}_html_for_index"
         html = if @action_view.respond_to?(html_for_index_method)
           @action_view.send html_for_index_method, record
+        elsif @acts_as_list_position_column
+          index_value(record)
         elsif @link_to_args
           @action_view.link_to(
-            @action_view.send(:h, string(record)),
+            @action_view.send(:h, index_value(record)),
             @link_to_args.call(record)
           )
         else
-          unconfigured_html(record)
+          @action_view.send(:h, index_value(record))
         end
         html = '&nbsp;' if html.blank?
         html
+      end
+      
+      def show_html(record)
+        html_for_index_method = "#{name}_html_for_show"
+        html = if @action_view.respond_to?(html_for_index_method)
+          @action_view.send html_for_index_method, record
+        elsif @acts_as_list_position_column
+          index_value(record)
+        elsif @link_to_args
+          @action_view.link_to(
+            @action_view.send(:h, index_value(record)),
+            @link_to_args.call(record)
+          )
+        else
+          @action_view.send(:h, index_value(record))
+        end
+        html = '&nbsp;' if html.blank?
+        html
+      end
+      
+      def index_value(record)
+        value_method = "#{@column.name}_value"
+        if @action_view.respond_to?(value_method)
+          @action_view.send value_method, record
+        elsif @acts_as_list_position_column
+          @action_view.send :image_tag, 'admin_assistant/drag.png', :class => "drag"
+        else
+          field_value record
+        end
+      end
+      
+      def label
+        if @column.custom_label
+          @column.custom_label
+        elsif @column.name.to_s == 'id'
+          'ID'
+        else
+          @column.name.to_s.capitalize.gsub(/_/, ' ') 
+        end
       end
     
       def next_sort_params
@@ -154,202 +116,351 @@ class AdminAssistant
             next_sort_order = nil
           end
         end
-        @action_view.params.merge(
-          :sort => name_for_sort, :sort_order => next_sort_order
-        )
-      end
-      
-      def set_instance_variables_from_options(admin_assistant, opts)
-        index = opts[:index]
-        setting = admin_assistant.index_settings[name.to_sym]
-        @link_to_args = setting.link_to_args
-        @sort_order = index.sort_order if name == index.sort
-        @image_size = setting.image_size
-        @ajax_toggle_allowed =
-            admin_assistant.update? && setting.ajax_toggle != false
-      end
-      
-      def td_css_class
-        'sort' if sort_order
-      end
-      
-      def unconfigured_html(record)
-        @action_view.send(:h, string(record))
-      end
-    end
-    
-    module SearchViewMethods      
-      def set_instance_variables_from_options(admin_assistant, opts)
-        setting = admin_assistant.search_settings[name.to_sym]
-        unless setting.comparators == false
-          @comparators = :all
-        end
-        @search = opts[:search]
-        @blank_checkbox = setting.blank_checkbox
-      end
-    end
-    
-    module SimpleColumnSearchViewMethods
-      include SearchViewMethods
-      
-      def blank_checkbox_html(form)
-        check_box_and_hidden_tags(
-          "search[#{name}(blank)]", form.object.blank?(@column.name)
-        ) + "is blank"
-      end
-      
-      def boolean_input(form)
-        opts = [['', nil]]
-        if @boolean_labels
-          opts << [@boolean_labels.first, true]
-          opts << [@boolean_labels.last, false]
-        else
-          opts << ['true', true]
-          opts << ['false', false]
-        end
-        form.select(name, opts)
-      end
-      
-      def comparator_html(search)
-        selected_comparator = search.comparator(@column.name) || '='
-        option_tags = comparator_opts.map { |text, value|
-          opt = "<option value=\"#{value}\""
-          if selected_comparator == value
-            opt << " selected=\"selected\""
-          end
-          opt << ">#{text}</option>"
-        }.join("\n")
-        @action_view.select_tag(
-          "search[#{name}(comparator)]", option_tags
-        )
-      end
-      
-      def comparator_opts
-        [
-          ['greater than', '>'], ['greater than or equal to', '>='],
-          ['equal to', '='], ['less than or equal to', '<='],
-          ['less than', '<']
-        ]
-      end
-      
-      def html(form)
-        input = ''
-        if @column.field_type == :boolean
-          input = boolean_input form
-        elsif @column.field_type == :datetime
-          input << comparator_html(form.object) << ' ' if @comparators == :all
-          input << form.datetime_select(name, :include_blank => true)
-          input << @action_view.send(
-            :link_to_function, 'Clear',
-            "AdminAssistant.clear_datetime_select('search_#{name.underscore}')"
-          )
-        else
-          if @column.field_type == :integer && @comparators == :all
-            input << comparator_html(form.object) << ' '
-          end
-          input << form.text_field(name)
-          input << blank_checkbox_html(form) if @blank_checkbox
-        end
-        "<p><label>#{label}</label> <br/>#{input}</p>"
-      end
-    end
-    
-    module ShowViewMethods
-      def html(record)
-        @action_view.send(:h, string(record))
-      end
-    end
-
-    class View
-      attr_reader :sort_order
-      
-      def initialize(column, action_view, admin_assistant, opts = {})
-        @column, @action_view, @opts = column, action_view, opts
-        @model_class = admin_assistant.model_class
-        base_setting = admin_assistant[name]
-        @boolean_labels = base_setting.boolean_labels
-        @strftime_format = base_setting.strftime_format
-        fem_name = name + '_exists?'
-        if @action_view.respond_to?(fem_name)
-          @file_exists_method = @action_view.method(fem_name)
-        end
-        @label = base_setting.label
-        @polymorphic_types = base_setting.polymorphic_types
-        if respond_to?(:set_instance_variables_from_options)
-          set_instance_variables_from_options(admin_assistant, opts)
-        end
-      end
-      
-      def check_box_and_hidden_tags(input_name, value)
-        # Rails 2.3 wants the hidden tag to come before the checkbox, but it's
-        # the opposite for Rails 2.2 and 2.1
-        if RAILS_GEM_VERSION =~ /^2.3/
-          @action_view.send(:hidden_field_tag, input_name, '0') +
-              @action_view.send(:check_box_tag, input_name, '1', value)
-        else
-          @action_view.send(:check_box_tag, input_name, '1', value) +
-              @action_view.send(:hidden_field_tag, input_name, '0')
-        end
-      end
-      
-      def label
-        if @label
-          @label
-        elsif @column.name.to_s == 'id'
-          'ID'
-        else
-          @column.name.to_s.capitalize.gsub(/_/, ' ') 
-        end
-      end
-      
-      def name
-        @column.name
+        { :sort => name_for_sort, :sort_order => next_sort_order }
       end
       
       def paperclip?
         @column.is_a?(PaperclipColumn)
       end
       
-      def sort_possible?(total_entries)
-        @column.is_a?(ActiveRecordColumn) ||
-            (@column.is_a?(BelongsToColumn) && total_entries < 100_000)
+      def sort_possible?
+        @column.is_a?(ActiveRecordColumn) || @column.is_a?(BelongsToColumn)
       end
-      
-      def string(record)
-        string_method = "#{@column.name}_string"
-        if @action_view.respond_to?(string_method)
-          @action_view.send string_method, record
-        else
-          value = value(record)
-          if @boolean_labels
-            value ? @boolean_labels.first : @boolean_labels.last
-          elsif value.respond_to?(:strftime) && @strftime_format
-            value.strftime @strftime_format
+    end
+  end
+  
+  class ActiveRecordColumn < Column
+    attr_accessor :search_terms
+    
+    def initialize(ar_column)
+      @ar_column = ar_column
+    end
+    
+    def add_to_query(ar_query, type_conditions = "and" )
+      unless @search_terms.blank?
+        #ar_query.boolean_join = :and
+        case sql_type
+          when :boolean
+            ar_query.send( "add_#{type_conditions}_condition", "#{name} = ?" )
+            ar_query.bind_vars << search_value
           else
-            value.to_s
-          end
+            ar_query.send( "add_#{type_conditions}_condition", "LOWER(#{name}) like LOWER(?)" )
+            ar_query.bind_vars << "%#{@search_terms}%"
         end
       end
-      
-      def value(record)
-        record.send(name) if record.respond_to?(name)
+    end
+    
+    def contains?(column_name)
+      column_name.to_s == @ar_column.name
+    end
+    
+    def name
+      @ar_column.name
+    end
+    
+    def search_value
+      case sql_type
+        when :boolean
+          @search_terms.blank? ? nil : (@search_terms == 'true')
+        else
+          @search_terms
       end
     end
     
-    class FormView < View
-      include FormViewMethods
+    def sql_type
+      @ar_column.type
     end
+    
+    class View < AdminAssistant::Column::View
+      def initialize(column, action_view, opts)
+        super
+        @boolean_labels = opts[:boolean_labels]
+      end
+      
+      def add_to_form(form)
+        case @input || @column.sql_type
+          when :select
+            form.select name, [["False", false], ["True", true]]
+          when :text
+            form.text_area name
+          when :boolean
+            form.check_box name
+          when :datetime
+            form.datetime_select name, :include_blank => true
+          when :date
+            form.date_select name, :include_blank => true
+          when :us_state
+            form.select(
+              name, ordered_us_state_names_and_codes, :include_blank => true
+            )
+          else
+            form.text_field name
+          end
+      end
 
-    class IndexView < View
-      include IndexViewMethods
+      def field_value(record)
+        record.send(name) if record.respond_to?(name)
+      end
+      
+      def index_value(record)
+        value = super
+        if @boolean_labels
+          value = value ? @boolean_labels.first : @boolean_labels.last
+        end
+        value
+      end
+      
+      def ordered_us_state_names_and_codes
+        {
+          'Alabama' => 'AL', 'Alaska' => 'AK', 'Arizona' => 'AZ',
+          'Arkansas' => 'AR', 'California' => 'CA', 'Colorado' => 'CO', 
+          'Connecticut' => 'CT', 'Delaware' => 'DE',
+          'District of Columbia' => 'DC', 'Florida' => 'FL', 'Georgia' => 'GA',
+          'Hawaii' => 'HI', 'Idaho' => 'ID', 'Illinois' => 'IL',
+          'Indiana' => 'IN', 'Iowa' => 'IA', 'Kansas' => 'KS',
+          'Kentucky' => 'KY', 'Louisiana' => 'LA', 'Maine' => 'ME',
+          'Maryland' => 'MD', 'Massachusetts' => 'MA', 'Michigan' => 'MI', 
+          'Minnesota' => 'MN', 'Mississippi' => 'MS', 'Missouri' => 'MO', 
+          'Montana' => 'MT', 'Nebraska' => 'NE', 'Nevada' => 'NV',
+          'New Hampshire' => 'NH', 'New Jersey' => 'NJ', 'New Mexico' => 'NM', 
+          'New York' => 'NY', 'North Carolina' => 'NC', 'North Dakota' => 'ND',
+          'Ohio' => 'OH', 'Oklahoma' => 'OK', 'Oregon' => 'OR',
+          'Pennsylvania' => 'PA', 'Puerto Rico' => 'PR',
+          'Rhode Island' => 'RI', 'South Carolina' => 'SC',
+          'South Dakota' => 'SD', 'Tennessee' => 'TN', 'Texas' => 'TX',
+          'Utah' => 'UT', 'Vermont' => 'VT', 'Virginia' => 'VA',
+          'Washington' => 'WA', 'West Virginia' => 'WV', 'Wisconsin' => 'WI', 
+          'Wyoming' => 'WY'
+        }.sort_by { |name, code| name }
+      end
+      
+      def search_html
+        input = case @column.sql_type
+          when :boolean
+            opts = [['', nil]]
+            if @boolean_labels
+              opts << [@boolean_labels.first, true]
+              opts << [@boolean_labels.last, false]
+            else
+              opts << ['true', true]
+              opts << ['false', false]
+            end
+            @action_view.select("search", name, opts)
+          else
+            @action_view.text_field_tag("search[#{name}]", @search[name])
+        end
+        "<p><label>#{label}</label> <br/>#{input}</p>"
+      end
+    end
+  end
+  
+  class AdminAssistantColumn < Column
+    attr_reader :name
+    attr_accessor :search_terms
+    
+    def initialize(name)
+      @name = name.to_s
     end
     
-    class SearchView < View
-      include SearchViewMethods
+    def contains?(column_name)
+      column_name.to_s == @name
     end
     
-    class ShowView < View
-      include ShowViewMethods
+    def add_to_query(ar_query, type_conditions = "and" )
+      unless @search_terms.blank?
+        ar_query.send( "add_#{type_conditions}_condition", "LOWER(#{name}) like LOWER(?)" )
+        ar_query.bind_vars << "%#{@search_terms}%"
+      end
+    end
+    
+    class View < AdminAssistant::Column::View
+      def field_value(record)
+        record.send(name) if record.respond_to?(name)
+      end
+      
+    end
+  end
+  
+  class HasOneColumn < Column
+    def initialize(has_one_assoc)
+      @has_one_assoc = has_one_assoc
+    end
+    
+    def associated_class
+      @has_one_assoc.klass
+    end
+    
+    def name
+      @has_one_assoc.name.to_s
+    end
+    
+    def contains?(column_name)
+      column_name.to_s == @name
+    end
+  end
+  
+  class HasManyColumn < Column
+    def initialize(has_one_assoc)
+      @has_one_assoc = has_one_assoc
+    end
+    
+    def associated_class
+      @has_one_assoc.klass
+    end
+    
+    def name
+      @has_one_assoc.name.to_s
+    end
+    
+    def contains?(column_name)
+      column_name.to_s == @name
+    end
+  end
+  
+  class BelongsToColumn < Column
+    def initialize(belongs_to_assoc, model_class)
+      @belongs_to_assoc = belongs_to_assoc
+      @model_class = model_class
+    end
+    
+    def associated_class
+      @belongs_to_assoc.klass
+    end
+    
+    def model_class
+      @model_class
+    end
+    
+    def association_foreign_key
+      @belongs_to_assoc.association_foreign_key
+    end
+    
+    def contains?(column_name)
+      column_name.to_s == name
+    end
+    
+    def default_name_method
+      [:name, :title, :login, :username].detect { |m|
+        associated_class.columns.any? { |column| column.name.to_s == m.to_s }
+      }
+    end
+    
+    def model_class
+      @model_class
+    end
+    
+    def name
+      @belongs_to_assoc.name.to_s
+    end
+    
+    def order_sql_field
+      sql = "#{@belongs_to_assoc.table_name}. "
+      sql << if default_name_method
+        default_name_method.to_s
+      else
+        @belongs_to_assoc.association_foreign_key
+      end
+    end
+    
+    class View < AdminAssistant::Column::View
+      def add_to_form(form)
+        include_blank = model_class ? model_class.columns.detect{ |col| col.name == association_foreign_key }.null : false
+        opts = { :include_blank => include_blank }
+        
+        form.select(
+          association_foreign_key,
+          associated_class.
+              find(:all).
+              sort_by { |model| model.send(default_name_method) }.
+              map { |model| [model.send(default_name_method), model.id] },
+          opts
+        )
+      end
+    
+      def field_value(record)
+        assoc_value = record.send name
+        if assoc_value.respond_to?(:name_for_admin_assistant)
+          assoc_value.name_for_admin_assistant
+        elsif assoc_value && default_name_method
+          assoc_value.send default_name_method
+        end
+      end
+    end
+  end
+  
+  class DefaultSearchColumn < Column
+    attr_reader :terms
+    
+    def initialize(terms, model_class)
+      @terms, @model_class = terms, model_class
+    end
+    
+    def add_to_query(ar_query, type_conditions = "or" )
+      searchable_columns.each do |column|
+        ar_query.send( "add_#{type_conditions}_condition", "LOWER(#{column.name}) like LOWER(?)" )
+        ar_query.bind_vars << "%#{@terms}%"
+      end
+    end
+    
+    def searchable_columns
+      @model_class.columns.select { |column|
+        [:string, :text].include?(column.type)
+      }
+    end
+    
+    class View < AdminAssistant::Column::View
+      def search_html
+        @action_view.text_field_tag("search", @column.terms)
+      end
+    end
+  end
+  
+  class FileColumnColumn < Column
+    attr_reader :name
+    
+    def initialize(name)
+      @name = name.to_s
+    end
+    
+    def contains?(column_name)
+      column_name.to_s == @name
+    end
+    
+    class View < AdminAssistant::Column::View
+      def add_to_form(form)
+        form.file_field name
+      end
+      
+      def index_html(record)
+        @action_view.instance_variable_set :@record, record
+        @action_view.image_tag(
+          @action_view.url_for_file_column('record', @column.name)
+        )
+      end
+    end
+  end
+  
+  class PaperclipColumn < Column
+    attr_reader :name
+    
+    def initialize(name)
+      @name = name.to_s
+    end
+    
+    def contains?(column_name)
+      column_name.to_s == @name ||
+      column_name.to_s =~
+          /^#{@name}_(file_name|content_type|file_size|updated_at)$/
+    end
+    
+    class View < AdminAssistant::Column::View
+      def add_to_form(form)
+        form.file_field name
+      end
+      
+      def index_html(record)
+        @action_view.image_tag record.send(@column.name).url
+      end
     end
   end
 end

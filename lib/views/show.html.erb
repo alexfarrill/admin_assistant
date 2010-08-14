@@ -1,19 +1,39 @@
-<div class="admin_assistant show <%=
+<% 
+  col_def_array = []
+  @show.view(self).columns.each do |column| 
+    col_def_array << column
+  end
+%>
+
+<div id="admin_assistant" class="form <%=
   @admin_assistant.controller_css_class(controller)
 %>">
-  <div class="aa_header">
-    <h2><%=
-      h("#{request.model_class_name(@record).capitalize} #{@record.id}")
-    %></h2>
-    <%= link_to 'Edit', :action => 'edit', :id => @record.id %>
+  <% id = nil unless defined?(id) %>
+  <div id="aa_header">
+    <h2><%= h(@show.title) %></h2>
+    <div id="aa_actions">
+    <%= link_to('Back to index', {:action => 'index'}.merge(remebered_get_params_without)) %>
+    </div>
   </div>
-  <%
-  show_view = AdminAssistant::ShowView.new(@record, @admin_assistant, self)
-  %>
-  <% show_view.columns.each do |column| %>
-    <div class="column">
-    <label><%= h(column.label) %></label>
-    <br /><%= show_view.column_html(column) %>
+  
+  <% if flash[:notice] %>
+    <div style="clear: both;" class="notice">
+      <%= flash[:notice] %>
     </div>
   <% end %>
+
+  <div id="aa_form">
+    <% col_def_array.each do |column| %>
+      <div class="column">
+        <label><%= h(column.label) %></label>
+        <div class="form_input"><%= column.show_html( @record ) %></div>
+      </div>
+    <% end %>
+    
+    <div class="cb"></div>
+    <div id="aa_end_back_link">
+      <%= link_to('Back', {:action => 'index'}.merge(remebered_get_params_without)) %>
+    </div>
+  </div>
+ 
 </div>

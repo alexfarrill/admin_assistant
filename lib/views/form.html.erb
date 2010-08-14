@@ -1,38 +1,43 @@
 <%
 form_view = AdminAssistant::FormView.new(@record, @admin_assistant, self)
 %>
-<div class="admin_assistant form <%=
+<div id="admin_assistant" class="form <%=
   @admin_assistant.controller_css_class(controller)
 %>">
   <% id = nil unless defined?(id) %>
-  <div class="aa_header">
-    <h2><%= h(form_view.title) %></h2>
-    <div class="actions">
-    <%= link_to('Back to index', :action => 'index') %>
+  <div id="aa_header">
+    <h2><%= form_view.header %></h2>
+    <div id="aa_actions">
+    <%= link_to('Back to index', {:action => 'index'}.merge(remebered_get_params_without)) %>
     </div>
   </div>
   <% if !@record.errors.empty? %>
     <%= error_messages_for 'record' %>
   <% end %>
-  <% form_for(@record, form_view.form_for_args) do |rails_form| %>
-    <%  if request.referer %>
-      <%= hidden_field_tag 'referer', request.referer%>
-    <% end %>
+
+  <% form_for(:record, @record, form_view.form_for_args) do |rails_form| %>
+    <%= remembered_hidden_fields_without %>
 
     <% form_view.columns.each do |column| %>
-      <div class="column">
-      <label><%= h(column.label) %></label>
-      <% if column.description %>
-        <p class="description"><%= h(column.description) %></p>
-      <% end %>
-      <br /><%= column.html(rails_form) %>
+      <div class="column <%= "aa_form_#{column.name}" -%>">
+        <label><%= h(column.label) %></label>
+        <div class="form_input"><%= form_view.column_html(column, rails_form) %></div>
       </div>
     <% end %>
       <div>
-        <%= submit_tag(form_view.submit_value) %>
+        <%= submit_tag(form_view.submit_value, :class => "submit" ) %>
         <% form_view.extra_submit_buttons.each do |extra_submit_button| %>
-          <%= submit_tag(extra_submit_button) %>
+          <%= submit_tag(extra_submit_button, :class => "submit") %>
         <% end %>
       </div>
   <% end %>
+  
 </div>
+
+<% if form_view.hide && columns_to_hide = form_view.hide.call(params, @record, current_user) %>
+  <script type="text/javascript">
+    <% columns_to_hide.each do |col| %>
+      $$('.column.aa_form_<%= col.to_s -%>').each(function(elem) { elem.hide(); });
+    <% end %>
+  </script>
+<% end %>
