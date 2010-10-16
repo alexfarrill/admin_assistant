@@ -49,7 +49,7 @@ class AdminAssistant
     end
     
     def find_include
-      includes = settings.includes || []
+      includes = Array(settings.includes)
       belongs_to_sort_column(true).each do |by_assoc|
         includes << by_assoc.name
       end
