@@ -16,3 +16,4 @@ needed in admin interfaces. Current features include:
 * Built-in support for Paperclip and FileColumn
 
 Copyright (c) 2009 Francis Hwang, released under the MIT license
+Forked by Alex Farrill
