@@ -43,7 +43,7 @@ class AdminAssistant
       
       def index_td_css_class
         ary = []
-        ary << "aacol_#{@column.name.underscorize}"
+        ary << "aacol_#{@column.name.downcase.gsub(/\s+/, "_")}"
         ary << 'sort' if sort_order
         ary.join(' ')
       end
@@ -125,6 +125,22 @@ class AdminAssistant
       
       def sort_possible?
         @column.is_a?(ActiveRecordColumn) || @column.is_a?(BelongsToColumn)
+      end
+      
+      def string(record)
+        string_method = "#{@column.name}_string"
+        if @action_view.respond_to?(string_method)
+          @action_view.send string_method, record
+        else
+          value = value(record)
+          if @boolean_labels
+            value ? @boolean_labels.first : @boolean_labels.last
+          elsif value.respond_to?(:strftime) && @strftime_format
+            value.strftime @strftime_format
+          else
+            value.to_s
+          end
+        end
       end
     end
   end
