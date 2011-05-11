@@ -73,6 +73,16 @@ class AdminAssistant
         params
       end
       
+      def redirect_after_create
+        url_params = @controller.send( :destination_after_create, @record, @controller.params ) if @controller.respond_to?(:destination_after_create)
+        @controller.send :redirect_to, url_params if url_params.is_a?(String)
+      end
+      
+      def redirect_after_update
+        url_params = @controller.send( :destination_after_update, @record, @controller.params ) if @controller.respond_to?(:destination_after_update)
+        @controller.send :redirect_to, url_params if url_params.is_a?(String)
+      end
+      
       def redirect_after_save
         if @controller.respond_to?(:destination_after_save)
           url_params = @controller.send( :destination_after_save, @record, @controller.params )
@@ -147,7 +157,7 @@ class AdminAssistant
         @record = model_class.new
         @record.attributes = params_for_save
         if save
-          redirect_after_save
+          redirect_after_create || redirect_after_save
         else
           @controller.instance_variable_set :@record, @record
           render_form
@@ -244,7 +254,7 @@ class AdminAssistant
         @record = model_class.find @controller.params[:id]
         @record.attributes = params_for_save
         if save
-          redirect_after_save
+          redirect_after_update || redirect_after_save
         else
           @controller.instance_variable_set :@record, @record
           render_form
