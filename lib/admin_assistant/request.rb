@@ -50,7 +50,7 @@ class AdminAssistant
         whole_params = {}
         @controller.params[:record].each do |k, v|
           k =~ /\([0-9]+i\)$/ ? (split_params[k] = v) : (whole_params[k] = v)
-        end
+        end if @controller.params[:record]
         bases = split_params.map{ |k, v| k.gsub(/\([0-9]+i\)$/, '') }.uniq
         bases.each do |b|
           h = {}
