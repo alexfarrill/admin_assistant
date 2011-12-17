@@ -1,6 +1,4 @@
-<%
-form_view = AdminAssistant::FormView.new(@record, @admin_assistant, self)
-%>
+<% form_view = AdminAssistant::FormView.new(@record, @admin_assistant, self) %>
 <div id="admin_assistant" class="form <%=
   @admin_assistant.controller_css_class(controller)
 %>">
@@ -11,11 +9,11 @@ form_view = AdminAssistant::FormView.new(@record, @admin_assistant, self)
     <%= link_to('Back to index', {:action => 'index'}.merge(remebered_get_params_without)) %>
     </div>
   </div>
-  <% if !@record.errors.empty? %>
-    <%= error_messages_for 'record' %>
+  <% if @record.errors.any? %>
+    <%= error_messages_for :record %>
   <% end %>
 
-  <% form_for(:record, @record, form_view.form_for_args) do |rails_form| %>
+  <%= form_for(:record, form_view.form_for_args) do |rails_form| %>
     <%= remembered_hidden_fields_without %>
 
     <% form_view.columns.each do |column| %>
@@ -24,12 +22,14 @@ form_view = AdminAssistant::FormView.new(@record, @admin_assistant, self)
         <div class="form_input"><%= form_view.column_html(column, rails_form) %></div>
       </div>
     <% end %>
-      <div>
-        <%= submit_tag(form_view.submit_value, :class => "submit" ) %>
-        <% form_view.extra_submit_buttons.each do |extra_submit_button| %>
-          <%= submit_tag(extra_submit_button, :class => "submit") %>
-        <% end %>
-      </div>
+    
+    <div class="column">
+      <%= submit_tag form_view.submit_value, :class => "submit" %>
+      <%= form_view.extra_submit_buttons.each do |extra_submit_button| %>
+        <%= submit_tag extra_submit_button, :class => "submit" %>
+      <% end %>
+    </div>
+    <%= hidden_field_tag :redirect_url, params[:redirect_url] %>
   <% end %>
   
 </div>
