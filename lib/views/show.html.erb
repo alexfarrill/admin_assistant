@@ -18,7 +18,7 @@
   
   <% if flash[:notice] %>
     <div style="clear: both;" class="notice">
-      <%= flash[:notice] %>
+      <%= flash[:notice].html_safe %>
     </div>
   <% end %>
 
