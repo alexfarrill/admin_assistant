@@ -2,11 +2,12 @@ require 'ar_query'
 
 class AdminAssistant
   class Index
-    def initialize(admin_assistant, action_view, current_user, url_params = {})
+    def initialize(admin_assistant, action_view, current_user, url_params = {}, session = nil)
       @admin_assistant = admin_assistant
       @url_params = url_params
       @action_view = action_view
       @current_user = current_user
+      @session = session
     end
     
     def belongs_to_sort_column( ignore_sort = false )
@@ -49,7 +50,7 @@ class AdminAssistant
     end
     
     def find_include
-      includes = Array(settings.includes)
+      includes = Array(settings.includes) || []
       belongs_to_sort_column(true).each do |by_assoc|
         includes << by_assoc.name
       end
@@ -92,26 +93,25 @@ class AdminAssistant
     
     def records
       unless @records
-        ar_query = ARQuery.new(
-          :order => order_sql, :include => find_include,
-          :per_page => per_page, :page => @url_params[:page]
-        )
+        opts = {}
         
-        search.add_to_query(ar_query) if @url_params[:search]
+        results = model_class.order(order_sql).scoped( :include => find_include)
+
+        if @url_params[:search]
+          ar_query = ARQuery.new
+          search.add_to_query(ar_query) 
+          results = results.where(ar_query[:conditions])
+        end
         
         if conditions
-          conditions_sql = conditions.call @url_params, @current_user
-          ar_query.add_and_condition( conditions_sql ) if conditions_sql
+          conditions_sql = conditions.call @url_params, @current_user, @session
+          results = results.where(conditions_sql)
         end
         
-        if settings.total_entries
-          ar_query[:total_entries] = settings.total_entries.call
-        end
+        opts = { :page => @url_params[:page], :per_page => per_page }
+        opts.merge! :total_entries => settings.total_entries if settings.total_entries
         
-        opts = ar_query
-        opts[:conditions] = ar_query[:conditions]
-        
-        @records = model_class.paginate :all, opts
+        @records = results.paginate opts
       end
       
       @records
@@ -121,11 +121,7 @@ class AdminAssistant
       slug = "_filter.html.erb"
       abs_template_file = File.join( Rails.root, 'app/views', controller.controller_path, slug )
       if File.exist?(abs_template_file)
-        template = if RAILS_GEM_VERSION == '2.1.0'
-          File.join(controller.controller_path, slug)
-        else
-          abs_template_file
-        end
+        template = abs_template_file
         @action_view.render :file => template
       end
     end
@@ -270,8 +266,9 @@ class AdminAssistant
           ) << " "
         end
         if destroy? && (link_syms.empty? || link_syms.include?(:destroy))
-          links << @action_view.link_to_remote(
+          links << @action_view.link_to(
             'Delete',
+            :remote => true,
             :url => {:action => 'destroy', :id => record.id},
             :confirm => 'Are you sure?',
             :success =>
