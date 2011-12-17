@@ -7,17 +7,37 @@ class AdminAssistant
       klass.new self, action_view, opts
     end
   
-    class View < Delegator
+    class View
       attr_reader :sort_order
       
       def initialize(column, action_view, opts)
-        super(column)
+        # super(column)
         @column, @action_view, @opts = column, action_view, opts
         @input = opts[:input]
         @link_to_args = opts[:link_to_args]
         @search = opts[:search]
         @sort_order = opts[:sort_order]
         @acts_as_list_position_column = opts[:acts_as_list_position_column]
+      end
+      
+      def name
+        @column.name
+      end
+      
+      def model_class
+        @column.model_class
+      end
+      
+      def association_foreign_key
+        @column.association_foreign_key
+      end
+      
+      def associated_class
+        @column.associated_class
+      end
+      
+      def default_name_method
+        @column.default_name_method
       end
       
       def __getobj__
@@ -42,10 +62,7 @@ class AdminAssistant
       end
       
       def index_td_css_class
-        ary = []
-        ary << "aacol_#{@column.name.downcase.gsub(/\s+/, "_")}"
-        ary << 'sort' if sort_order
-        ary.join(' ')
+        'sort' if sort_order
       end
       
       def index_html(record)
@@ -125,22 +142,6 @@ class AdminAssistant
       
       def sort_possible?
         @column.is_a?(ActiveRecordColumn) || @column.is_a?(BelongsToColumn)
-      end
-      
-      def string(record)
-        string_method = "#{@column.name}_string"
-        if @action_view.respond_to?(string_method)
-          @action_view.send string_method, record
-        else
-          value = value(record)
-          if @boolean_labels
-            value ? @boolean_labels.first : @boolean_labels.last
-          elsif value.respond_to?(:strftime) && @strftime_format
-            value.strftime @strftime_format
-          else
-            value.to_s
-          end
-        end
       end
     end
   end
