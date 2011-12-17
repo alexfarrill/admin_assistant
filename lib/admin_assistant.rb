@@ -157,7 +157,7 @@ class AdminAssistant
   module ControllerMethods
     def self.included(controller)
       controller.extend ControllerClassMethods
-      controller.class_inheritable_accessor :admin_assistant
+      controller.class_attribute :admin_assistant
     end
   end
   
@@ -180,10 +180,19 @@ end
 
 ActionController::Base.send :include, AdminAssistant::ControllerMethods
 
+rails_public_path = File.join File.dirname(__FILE__), "../../../../public"
+
 FileUtils.copy(
   "#{File.dirname(__FILE__)}/stylesheets/admin_assistant.css",
-  "#{RAILS_ROOT}/public/stylesheets/admin_assistant.css"
+  File.join( rails_public_path, "stylesheets/admin_assistant.css" )
 )
-images_dir = "#{RAILS_ROOT}/public/images/admin_assistant"
+
+FileUtils.copy(
+  "#{File.dirname(__FILE__)}/javascripts/admin_assistant.js",
+  File.join( rails_public_path, "javascripts/admin_assistant.js" )
+)
+
+images_dir = File.join rails_public_path, "images/admin_assistant"
+
 FileUtils.mkdir(images_dir) unless File.exist?(images_dir)
 FileUtils.cp_r(Dir.glob("#{File.dirname(__FILE__)}/images/*"), images_dir)
