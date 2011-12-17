@@ -3,5 +3,5 @@
   col_def_array = []
   @index.view(self).columns.each do |column| 
     col_def_array << column
-  end -%><%= col_def_array.map(&:name).join(',') %>
+  end -%><%= col_def_array.map{|x| x.name}.join(',') %>
 <%= @index.records(10000000).map{|record| col_def_array.map{|col| col.index_html(record)}.join(',')}.join("\r") -%>
