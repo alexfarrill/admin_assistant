@@ -125,7 +125,7 @@ class AdminAssistant
       super
       @actions = {}
       @s_actions = true
-      @sort_by = "`#{admin_assistant.model_class.table_name}`.id desc"
+      @sort_by = "`#{admin_assistant.model_class.table_name}`.`id` desc"
       @boolean_labels = {}
       @link_to_args = {}
       @right_column_lambdas = []
