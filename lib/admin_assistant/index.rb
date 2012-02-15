@@ -267,13 +267,7 @@ class AdminAssistant
         end
         if destroy? && (link_syms.empty? || link_syms.include?(:destroy))
           links << @action_view.link_to(
-            'Delete',
-            :remote => true,
-            :url => {:action => 'destroy', :id => record.id},
-            :confirm => 'Are you sure?',
-            :success =>
-                "Effect.Fade('record_#{record.id}')",
-            :method => :delete
+            'Delete', :action => 'destroy', :id => record.id
           ) << ' '
         end
         if show? && (link_syms.empty? || link_syms.include?(:show))
